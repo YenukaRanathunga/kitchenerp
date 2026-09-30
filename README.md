@@ -4,10 +4,11 @@ Shared inventory for office kitchen, cleaning, medical, and other supplies. The 
 
 ## Vercel setup
 
-This is a Next.js app backed by Neon Postgres. Import this repository into Vercel, add a Neon database through Vercel Storage, and configure these server-side environment variables:
+This is a Next.js app backed by Neon Postgres. Import this repository into Vercel, add a Neon database through Vercel Storage, and configure this server-side environment variable:
 
 - `DATABASE_URL`: Neon connection string, supplied by the Vercel integration.
-- `OFFICE_STOCK_PASSWORD`: strong password shared with authorized office staff.
+
+The inventory opens directly without a login. Anyone with the public deployment URL can view and change stock, so share the link only with people who should manage this inventory.
 
 The database tables and starter items are created automatically on the first inventory request. All starter counts begin at zero. Stock changes are shared across signed-in browsers and each issue or receipt records a person and time.
 
@@ -18,4 +19,5 @@ pnpm install
 pnpm dev
 ```
 
-Create `.env.local` with both variables before opening the local app. Do not commit `.env.local`.
+Create `.env.local` with `DATABASE_URL` before opening the local app. Do not commit `.env.local`.
+

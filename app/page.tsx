@@ -27,7 +27,6 @@ export default function Home() {
     try {
       const response = await fetch("/api/inventory", { cache: "no-store" });
       const result = await response.json() as Inventory & { error?: string };
-      if (response.status === 401) { window.location.assign("/login"); return; }
       if (!response.ok) throw new Error(result.error || "Inventory could not be loaded.");
       setData(result);
       setError("");
@@ -117,3 +116,4 @@ export default function Home() {
     </form></DialogContent></Dialog>}
   </div>;
 }
+
