@@ -6,7 +6,7 @@ export async function GET() {
     const sql = getDb();
     const [items, history] = await Promise.all([
       sql`SELECT id, name, category, quantity, reorder_at AS "reorderAt" FROM items ORDER BY LOWER(name)`,
-      sql`SELECT m.id, m.item_id AS "itemId", i.name AS "itemName", m.type, m.quantity, m.person, m.note, m.created_at AS "createdAt" FROM movements m JOIN items i ON i.id = m.item_id ORDER BY m.id DESC LIMIT 50`,
+      sql`SELECT m.id, m.item_id AS "itemId", i.name AS "itemName", m.type, m.quantity, m.created_at AS "createdAt" FROM movements m JOIN items i ON i.id = m.item_id ORDER BY m.id DESC LIMIT 50`,
     ]);
     return Response.json({ items, history });
   } catch (error) { return errorResponse(error); }
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     await ensureSchema();
     const sql = getDb();
     const inserted = await sql`INSERT INTO items (name, category, quantity, reorder_at) VALUES (${name}, ${category}, ${quantity}, ${reorderAt}) RETURNING id`;
-    if (quantity > 0) await sql`INSERT INTO movements (item_id, type, quantity, person, note) VALUES (${inserted[0].id}, 'received', ${quantity}, 'Initial stock', '')`;
+    if (quantity > 0) await sql`INSERT INTO movements (item_id, type, quantity) VALUES (${inserted[0].id}, 'received', ${quantity})`;
     return Response.json({ ok: true }, { status: 201 });
   } catch (error) {
     if ((error as { code?: string }).code === "23505") return Response.json({ error: "An item with this name already exists." }, { status: 409 });
@@ -48,3 +48,4 @@ export async function PATCH(request: Request) {
     return errorResponse(error);
   }
 }
+

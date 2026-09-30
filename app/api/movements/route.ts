@@ -2,27 +2,31 @@ import { ensureSchema, errorResponse, getDb, positiveInt } from "@/lib/inventory
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { itemId?: number; type?: string; quantity?: number; person?: string; note?: string };
+    const body = await request.json() as { itemId?: number; currentCount?: number; newCount?: number };
     const itemId = positiveInt(body.itemId);
-    const quantity = positiveInt(body.quantity);
-    const type = body.type;
-    const person = body.person?.trim() ?? "";
-    const note = body.note?.trim() ?? "";
-    if (!itemId || !quantity || !["issued", "received"].includes(type ?? "") || !person || person.length > 80 || note.length > 200) return Response.json({ error: "Enter a valid quantity and person." }, { status: 400 });
+    const currentCount = body.currentCount;
+    const newCount = body.newCount;
+    if (!itemId || !Number.isSafeInteger(currentCount) || !Number.isSafeInteger(newCount) ||
+        currentCount! < 0 || newCount! < 0 || currentCount! > 2147483647 || newCount! > 2147483647) {
+      return Response.json({ error: "Enter a valid stock count." }, { status: 400 });
+    }
+    if (newCount === currentCount) return Response.json({ ok: true });
+
     await ensureSchema();
-    const sql = getDb();
-    const change = type === "issued" ? -quantity : quantity;
-    const result = await sql`
+    const type = newCount! > currentCount! ? "received" : "issued";
+    const change = Math.abs(newCount! - currentCount!);
+    const result = await getDb()`
       WITH updated AS (
-        UPDATE items SET quantity = quantity + ${change}
-        WHERE id = ${itemId} AND quantity + ${change} >= 0
+        UPDATE items SET quantity = ${newCount}
+        WHERE id = ${itemId} AND quantity = ${currentCount}
         RETURNING id
       )
       INSERT INTO movements (item_id, type, quantity, person, note)
-      SELECT id, ${type}, ${quantity}, ${person}, ${note} FROM updated
+      SELECT id, ${type}, ${change}, '', '' FROM updated
       RETURNING id
     `;
-    if (!result.length) return Response.json({ error: "Item not found or not enough stock available." }, { status: 409 });
+    if (!result.length) return Response.json({ error: "Count changed on another device. Close this window and try again." }, { status: 409 });
     return Response.json({ ok: true });
   } catch (error) { return errorResponse(error); }
 }
+
