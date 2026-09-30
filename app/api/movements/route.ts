@@ -1,4 +1,4 @@
-import { errorResponse, getDb, positiveInt } from "@/lib/inventory";
+import { ensureSchema, errorResponse, getDb, positiveInt } from "@/lib/inventory";
 
 export async function POST(request: Request) {
   try {
@@ -9,13 +9,20 @@ export async function POST(request: Request) {
     const person = body.person?.trim() ?? "";
     const note = body.note?.trim() ?? "";
     if (!itemId || !quantity || !["issued", "received"].includes(type ?? "") || !person || person.length > 80 || note.length > 200) return Response.json({ error: "Enter a valid quantity and person." }, { status: 400 });
-    const db = getDb();
+    await ensureSchema();
+    const sql = getDb();
     const change = type === "issued" ? -quantity : quantity;
-    const results = await db.batch([
-      db.prepare("UPDATE items SET quantity = quantity + ? WHERE id = ? AND quantity + ? >= 0").bind(change, itemId, change),
-      db.prepare("INSERT INTO movements (item_id, type, quantity, person, note) SELECT ?, ?, ?, ?, ? WHERE changes() = 1").bind(itemId, type, quantity, person, note),
-    ]);
-    if (!results[0].meta.changes) return Response.json({ error: "Item not found or not enough stock available." }, { status: 409 });
+    const result = await sql`
+      WITH updated AS (
+        UPDATE items SET quantity = quantity + ${change}
+        WHERE id = ${itemId} AND quantity + ${change} >= 0
+        RETURNING id
+      )
+      INSERT INTO movements (item_id, type, quantity, person, note)
+      SELECT id, ${type}, ${quantity}, ${person}, ${note} FROM updated
+      RETURNING id
+    `;
+    if (!result.length) return Response.json({ error: "Item not found or not enough stock available." }, { status: 409 });
     return Response.json({ ok: true });
   } catch (error) { return errorResponse(error); }
 }
